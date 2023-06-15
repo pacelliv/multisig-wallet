@@ -6,8 +6,8 @@
 ### Install requirements with yarn
 
 ```
-git clone https://github.com/PacelliV/erc-20-felina-token.git
-cd erc-20-felina-token
+git clone https://github.com/pacelliv/multisig-wallet
+cd multisig-wallet
 ```
 
 Define the environment variables:
