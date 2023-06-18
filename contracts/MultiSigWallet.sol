@@ -69,7 +69,6 @@ contract MultiSigWallet is ReentrancyGuard {
     error MultiSigWallet__InvalidIndex(uint256 index);
     error MultiSigWallet__OnlyWallet();
     error MultiSigWallet__NftNotApproved();
-    error MultiSigWallet__UriQueryForNonExistentToken(address nft, uint256 tokenId);
 
     /**
      * @dev Checks if `msg.sender` is a current owner of the wallet.
@@ -301,9 +300,6 @@ contract MultiSigWallet is ReentrancyGuard {
      */
     function getTokenURI(address _nft, uint256 _tokenId) external view returns (string memory) {
         IERC721Metadata nft = IERC721Metadata(_nft);
-        if (nft.ownerOf(_tokenId) == address(0)) {
-            revert MultiSigWallet__UriQueryForNonExistentToken(_nft, _tokenId);
-        }
         return nft.tokenURI(_tokenId);
     }
 
