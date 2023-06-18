@@ -10,17 +10,22 @@ module.exports = async ({ deployments, getChainId }) => {
     const waitConfirmations = chainsConfig[chainId]["blockConfirmations"]
     const accounts = await ethers.getSigners()
 
-    const args = [
-        [
+    let owners
+    if (chainId === "31337") {
+        owners = [
             accounts[0].address,
             accounts[1].address,
             accounts[2].address,
             accounts[3].address,
             accounts[4].address,
             accounts[5].address,
-        ],
-        2,
-    ]
+        ]
+    } else {
+        // declare your list of owner for tesnet
+        owners = ["", "", ""]
+    }
+
+    const args = [owners, 2]
 
     log("----------------------------------------------------")
     log(`Deploying contract and waiting for ${waitConfirmations} block confirmations...`)
