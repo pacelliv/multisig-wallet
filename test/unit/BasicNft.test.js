@@ -19,7 +19,9 @@ const { assert } = require("chai")
                           try {
                               const tokenId = event[1].toString()
                               const ownerOf = await basicNft.ownerOf(tokenId)
+                              const tokenCounter = await basicNft.getTokenCounter()
 
+                              assert(tokenCounter.toNumber() > 0)
                               assert.equal(ownerOf, deployer)
                               assert.equal(tokenId, "0")
                               resolve()

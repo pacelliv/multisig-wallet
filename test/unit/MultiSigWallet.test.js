@@ -78,7 +78,7 @@ const { assert, expect } = require("chai")
           })
 
           describe("receive", () => {
-              it("should emit an event on receiving ETH", async () => {
+              it("should invoke the receive function and emit an event on receiving ETH", async () => {
                   const [signer] = await ethers.getSigners()
                   const value = ethers.utils.parseEther("1")
                   await expect(
@@ -86,6 +86,26 @@ const { assert, expect } = require("chai")
                           to: multiSigWallet.address,
                           value,
                           gasLimit: 30000,
+                      })
+                  )
+                      .to.emit(multiSigWallet, "Deposit")
+                      .withArgs(signer.address, ethers.utils.parseEther("1"))
+
+                  const walletBalance = await multiSigWallet.balance()
+                  assert.equal(walletBalance.toString(), value.toString())
+              })
+          })
+
+          describe("fallback", () => {
+              it("should invoke the fallback function and emit an event on receiving ETH", async () => {
+                  const [signer] = await ethers.getSigners()
+                  const value = ethers.utils.parseEther("1")
+                  await expect(
+                      signer.sendTransaction({
+                          to: multiSigWallet.address,
+                          value,
+                          gasLimit: 30000,
+                          data: "0x1111",
                       })
                   )
                       .to.emit(multiSigWallet, "Deposit")
@@ -574,6 +594,17 @@ const { assert, expect } = require("chai")
                   assert(endingOwners[0] === lastOwner)
                   // "-1" means the element doesn't exist in the array
                   assert(endingOwners.indexOf(firstOwner) === -1)
+              })
+          })
+
+          describe("getTokenURI", () => {
+              it("Returns the token URI", async () => {
+                  const expectedTokenURI =
+                      "https://ipfs.io/ipfs/QmaVkBn2tKmjbhphU7eyztbvSQU5EXDdqRyXZtRhSGgJGo"
+                  const mintNftTxResponse = await basicNft.mintNft("0")
+                  await mintNftTxResponse.wait(1)
+                  const tokenURI = await multiSigWallet.getTokenURI(basicNft.address, "0")
+                  assert(tokenURI === expectedTokenURI)
               })
           })
       })
