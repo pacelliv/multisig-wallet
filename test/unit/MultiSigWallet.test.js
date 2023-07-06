@@ -23,7 +23,7 @@ const { assert, expect } = require("chai")
                   })
               })
               it("set required number of approvals correctly", async () => {
-                  const required = await multiSigWallet.required()
+                  const required = await multiSigWallet.getRequired()
                   assert.equal(required.toString(), "2")
               })
               it("should revert if the number of approvals is greater than the length of the owners array", async () => {
@@ -234,7 +234,7 @@ const { assert, expect } = require("chai")
                       .to.emit(owner1Connected, "Approve")
                       .withArgs(owner1.address, 0)
 
-                  const isApproved = owner1Connected.isApproved(0, owner1.address)
+                  const isApproved = owner1Connected.checkApproval(0, owner1.address)
                   assert(isApproved)
               })
               it("should revert re-approving a transaction", async () => {
@@ -290,7 +290,7 @@ const { assert, expect } = require("chai")
                       .to.emit(owner1Connected, "Revoke")
                       .withArgs(owner1.address, 0)
 
-                  const isRevoked = owner1Connected.isApproved(0, owner1.address)
+                  const isRevoked = owner1Connected.checkApproval(0, owner1.address)
                   assert(isRevoked)
               })
           })
