@@ -5,11 +5,12 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Metadata} from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
+import {OwnerManager} from "./OwnerManager.sol";
 
 /**
- * @title MultiSigWallet
- * @author Eugenio Pacelli Flores Voitier
- * @notice This is a sample contract to create a basic multisig wallet
+ * @title MultiSigWallet.
+ * @author Eugenio Pacelli Flores Voitier.
+ * @notice This is a sample contract to create a basic multisig wallet.
  * @dev This multisig wallet can: (a) make simple ETH transactions,
  * (b) make contract calls, (c) handle ETH balance, (d) handle ERC20 tokens
  * and (f) handle NFTs.
@@ -19,8 +20,7 @@ import {IERC721Metadata} from "@openzeppelin/contracts/token/ERC721/extensions/I
  * THIS IS AN EXAMPLE CONTRACT THAT USES UN-AUDITED CODE.
  * DO NOT USE THIS CODE IN PRODUCTION.
  */
-
-contract MultiSigWallet is ReentrancyGuard {
+contract MultiSigWallet is ReentrancyGuard, OwnerManager {
     struct Transaction {
         address to;
         uint256 amount;
@@ -28,11 +28,8 @@ contract MultiSigWallet is ReentrancyGuard {
         bool executed;
     }
 
-    uint256 public immutable required;
     Transaction[] private transactions;
-    address[] private owners;
-    mapping(address => bool) public isOwner;
-    mapping(uint256 => mapping(address => bool)) public isApproved;
+    mapping(uint256 => mapping(address => bool)) private isApproved;
 
     event Deposit(address indexed sender, uint256 amount);
     event NftDeposit(address indexed sender, address indexed nft, uint256 indexed tokenId);
@@ -47,12 +44,7 @@ contract MultiSigWallet is ReentrancyGuard {
     event Approve(address indexed owner, uint256 txId);
     event Revoke(address indexed owner, uint256 txId);
     event Execute(address indexed owner, uint256 txId, address indexed to, bytes data);
-    event NewOwner(address indexed owner);
-    event OwnerRemoved(address indexed owner);
 
-    error MultiSigWallet__OwnersRequired();
-    error MultiSigWallet__InvalidNumberOfConfirmations();
-    error MultiSigWallet__DuplicateOwner(address duplicate);
     error MultiSigWallet__OnlyOwner();
     error MultiSigWallet__InvalidRecipient(address recipient);
     error MultiSigWallet__NonExistentTransaction();
@@ -60,14 +52,8 @@ contract MultiSigWallet is ReentrancyGuard {
     error MultiSigWallet__AlreadyExecuted();
     error MultiSigWallet__NotApproved();
     error MultiSigWallet__TransactionFailed();
-    error MultiSigWallet__InvalidOwner(address owner);
     error MultiSigWallet__InsufficientApprovals();
     error MultiSigWallet__InsufficientAllowance(uint256 allowance, uint256 amount);
-    error MultiSigWallet__AlreadyOwner(address owner);
-    error MultiSigWallet__MaximumNumberOfOwnersReached();
-    error MultiSigWallet__MinimumNumberOfOwnersReached();
-    error MultiSigWallet__InvalidIndex(uint256 index);
-    error MultiSigWallet__OnlyWallet();
     error MultiSigWallet__NftNotApproved();
 
     /**
@@ -110,35 +96,7 @@ contract MultiSigWallet is ReentrancyGuard {
         _;
     }
 
-    /**
-     * @dev Checks if `msg.sender` is the address of the contract, throws otherwise.
-     */
-    modifier onlyWallet() {
-        if (msg.sender != address(this)) revert MultiSigWallet__OnlyWallet();
-        _;
-    }
-
-    /**
-     * @dev Sets the values for {owners} and {required}. Throws if `_owners` is empty.
-     * Throws if `_required` is equal to zero or greater than the lenght of `_owners`.
-     * Throws if any of the `_owners` is the address zero. Throws if there is a duplicate
-     * among `_owners`.
-     */
-    constructor(address[] memory _owners, uint256 _required) {
-        if (_owners.length == 0) revert MultiSigWallet__OwnersRequired();
-        if (_required <= 0 || _required > _owners.length)
-            revert MultiSigWallet__InvalidNumberOfConfirmations();
-
-        for (uint256 i; i < _owners.length; i++) {
-            address owner = _owners[i];
-            if (owner == address(0)) revert MultiSigWallet__InvalidOwner(owner);
-            if (isOwner[owner]) revert MultiSigWallet__DuplicateOwner(owner);
-            isOwner[owner] = true;
-            owners.push(owner);
-        }
-
-        required = _required;
-    }
+    constructor(address[] memory _owners, uint256 _required) OwnerManager(_owners, _required) {}
 
     fallback() external payable {
         emit Deposit(msg.sender, msg.value);
@@ -218,7 +176,7 @@ contract MultiSigWallet is ReentrancyGuard {
     function execute(
         uint256 _txId
     ) external onlyOwner txExists(_txId) notExecuted(_txId) nonReentrant {
-        if (getApprovalCount(_txId) < required) revert MultiSigWallet__InsufficientApprovals();
+        if (getApprovalCount(_txId) < getRequired()) revert MultiSigWallet__InsufficientApprovals();
         Transaction storage transaction = transactions[_txId];
         transaction.executed = true;
 
@@ -237,32 +195,6 @@ contract MultiSigWallet is ReentrancyGuard {
     }
 
     /**
-     * @dev Grants ownership of the wallet to an account. Throws if `_owner`
-     * is already in `owners`. Throws if `owners` is at its maximum.
-     * @param _owner Address of the account to be granted ownership of the wallet.
-     */
-    function addOwner(address _owner) external onlyWallet {
-        if (isOwner[_owner]) revert MultiSigWallet__AlreadyOwner(_owner);
-        if (owners.length == 7) revert MultiSigWallet__MaximumNumberOfOwnersReached();
-        owners.push(_owner);
-        emit NewOwner(_owner);
-    }
-
-    /**
-     * @dev Removes ownership powers from an account. Throws if `index` is
-     * greater than the length of `owners`. Throws if `owners` is at its minimum.
-     * @param _index Identifier of the account.
-     */
-    function removeOwner(uint256 _index) external onlyWallet {
-        if (owners.length == 3) revert MultiSigWallet__MinimumNumberOfOwnersReached();
-        if (_index >= owners.length) revert MultiSigWallet__InvalidIndex(_index);
-        address owner = owners[_index];
-        owners[_index] = owners[owners.length - 1];
-        owners.pop();
-        emit OwnerRemoved(owner);
-    }
-
-    /**
      * @dev Reads the list of submitted transactions.
      */
     function getTransactions() external view returns (Transaction[] memory) {
@@ -270,17 +202,20 @@ contract MultiSigWallet is ReentrancyGuard {
     }
 
     /**
-     * @dev Reads the list of owners.
-     */
-    function getOwners() external view returns (address[] memory) {
-        return owners;
-    }
-
-    /**
      * @dev Reads the balance of ether in the wallet.
      */
     function balance() external view returns (uint256) {
         return address(this).balance;
+    }
+
+    /**
+     * @dev Check if transaciton `_txId` have been approved by `_owner`.
+     * @param _txId Unique identifier of a transaction.
+     * @param _owner Address of the owner
+     * Returns a boolean to indicate if the transaction was approved or not by `_owner`.
+     */
+    function checkApproval(uint256 _txId, address _owner) external view returns (bool) {
+        return isApproved[_txId][_owner];
     }
 
     /**
@@ -306,17 +241,17 @@ contract MultiSigWallet is ReentrancyGuard {
     /**
      * @dev Before a NFT is transferred this function is called by the
      * NFT contract to verify the wallet is a valid recipient.
-     * @param operator Address of the account granted permission over the NFT.
-     * @param from Owner of the NFT.
-     * @param tokenId Unique identifier of the NFT.
-     * @param data Encoded data of the transaction.
+     * param operator Address of the account granted permission over the NFT. (unused)
+     * param from Owner of the NFT. (unused)
+     * param tokenId Unique identifier of the NFT. (unused)
+     * param data Encoded data of the transaction. (unused)
      * Return `bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"))`.
      */
     function onERC721Received(
-        address operator,
-        address from,
-        uint256 tokenId,
-        bytes calldata data
+        address /* operator */,
+        address /* from */,
+        uint256 /* tokenId*/,
+        bytes calldata /* data */
     ) external pure returns (bytes4) {
         return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
     }
