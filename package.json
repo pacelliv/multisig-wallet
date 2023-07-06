@@ -2,7 +2,7 @@
     "name": "multisig-wallet",
     "license": "MIT",
     "version": "1.0.0",
-    "description": "A repo for creating an multisig wallet that supports ERC20 tokens",
+    "description": "A repo for creating an multisig wallet that supports ERC-20 and ERC-721 tokens",
     "scripts": {
         "clean": "yarn hardhat clean",
         "compile": "yarn hardhat compile",
